@@ -23,6 +23,12 @@ contract DEXLite is Ownable {
     error invalidAddress();
     error onlyLiquidatorPermitted();
     error invalidLiquidity();
+    error invalidAmount();
+    error TransferFailed();
+
+    //events
+    event LiqiudationAdded();
+    event TokenSwapped();
 
     //modifier
     modifier onlyLiquidator() {
@@ -46,5 +52,39 @@ contract DEXLite is Ownable {
         reservesB += amountB;
 
         liquidator[msg.sender] = Liquidator(true, amountA, amountB);
+
+        emit LiqiudationAdded();
+    }
+
+    function swapTokenAForTokenB(uint256 amountIn) external {
+        if (amountIn == 0) revert invalidAmount();
+
+        require(tokenA.transferFrom(msg.sender, address(this), amountIn), "Transaction Failed");
+
+        uint256 amountOut = (reservesB * amountIn) / (reservesA + amountIn);
+
+        reservesA += amountIn;
+        reservesB -= amountOut;
+
+        (bool success,) = msg.sender.call{value: amountOut}("");
+        if (!success) revert TransferFailed();
+
+        emit TokenSwapped();
+    }
+
+    function swapTokenBForTokenA(uint256 amountIn) external {
+        if (amountIn == 0) revert invalidAmount();
+
+        require(tokenB.transferFrom(msg.sender, address(this), amountIn), "Transaction Failed");
+
+        uint256 amountOut = (reservesA * amountIn) / (reservesB + amountIn);
+
+        reservesA -= amountOut;
+        reservesB += amountIn;
+
+        (bool success,) = msg.sender.call{value: amountOut}("");
+        if (!success) revert TransferFailed();
+
+        emit TokenSwapped();
     }
 }
