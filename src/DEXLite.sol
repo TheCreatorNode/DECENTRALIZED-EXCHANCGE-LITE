@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Math} from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 contract DEXLite is Ownable {
     IERC20 public tokenA;
@@ -12,12 +13,14 @@ contract DEXLite is Ownable {
         bool permitted;
         uint256 tokenA;
         uint256 tokenB;
+        uint256 PercentageShare;
     }
 
     mapping(address => Liquidator) public liquidator;
 
     uint256 public reservesA;
     uint256 public reservesB;
+    uint256 public totalLiquidity;
 
     //custom Error
     error invalidAddress();
@@ -25,6 +28,7 @@ contract DEXLite is Ownable {
     error invalidLiquidity();
     error invalidAmount();
     error TransferFailed();
+    error insufficientBalance();
 
     //events
     event LiqiudationAdded();
@@ -44,20 +48,37 @@ contract DEXLite is Ownable {
 
     function addLiquidity(uint256 amountA, uint256 amountB) external {
         if (amountA == 0 || amountB == 0) revert invalidLiquidity();
+        if (tokenA.balanceOf(msg.sender) < amountA || tokenB.balanceOf(msg.sender) < amountB) {
+            revert insufficientBalance();
+        }
 
         require(tokenA.transferFrom(msg.sender, address(this), amountA), "Tranfer Failed");
         require(tokenB.transferFrom(msg.sender, address(this), amountB), "Transfer Failed");
 
+        uint256 userShare;
+
+        if (reservesA == 0 && reservesB == 0) {
+            userShare = 1e18;
+        } else {
+            uint256 liquidityAdded = Math.sqrt(amountA * amountB);
+            totalLiquidity = Math.sqrt(reservesA * reservesB);
+            userShare = liquidityAdded * 1e18 / (totalLiquidity + liquidityAdded);
+        }
+
         reservesA += amountA;
         reservesB += amountB;
 
-        liquidator[msg.sender] = Liquidator(true, amountA, amountB);
+        liquidator[msg.sender].permitted = true;
+        liquidator[msg.sender].tokenA += amountA;
+        liquidator[msg.sender].tokenB += amountB;
+        liquidator[msg.sender].PercentageShare += userShare;
 
         emit LiqiudationAdded();
     }
 
     function swapTokenAForTokenB(uint256 amountIn) external {
         if (amountIn == 0) revert invalidAmount();
+        if (tokenA.balanceOf(msg.sender) < amountIn) revert insufficientBalance();
 
         require(tokenA.transferFrom(msg.sender, address(this), amountIn), "Transaction Failed");
 
@@ -66,7 +87,7 @@ contract DEXLite is Ownable {
         reservesA += amountIn;
         reservesB -= amountOut;
 
-        (bool success,) = msg.sender.call{value: amountOut}("");
+        bool success = tokenB.transfer(msg.sender, amountOut);
         if (!success) revert TransferFailed();
 
         emit TokenSwapped();
@@ -74,6 +95,7 @@ contract DEXLite is Ownable {
 
     function swapTokenBForTokenA(uint256 amountIn) external {
         if (amountIn == 0) revert invalidAmount();
+        if (tokenA.balanceOf(msg.sender) < amountIn) revert insufficientBalance();
 
         require(tokenB.transferFrom(msg.sender, address(this), amountIn), "Transaction Failed");
 
@@ -87,4 +109,6 @@ contract DEXLite is Ownable {
 
         emit TokenSwapped();
     }
+
+    function removeLiquidity(uint256 amount) external onlyLiquidator {}
 }

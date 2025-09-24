@@ -32,6 +32,11 @@ contract DEXLiteTest is Test {
         //mint token to liquidator
         mockTokenA.mint(liquidator, 1000 * 1e18);
         mockTokenB.mint(liquidator, 500 * 1e18);
+
+        //mint tokens to user
+
+        mockTokenA.mint(user, 100 * 1e18);
+        mockTokenB.mint(user, 70 * 1e18);
     }
 
     function testAddLiquidity() public {
@@ -44,7 +49,7 @@ contract DEXLiteTest is Test {
 
         assertEq(DEX.reservesA(), 100 * 1e18);
         assertEq(DEX.reservesB(), 50 * 1e18);
-        (bool permitted, uint256 tokenA, uint256 tokenB) = DEX.liquidator(liquidator);
+        (bool permitted, uint256 tokenA, uint256 tokenB,) = DEX.liquidator(liquidator);
 
         assertTrue(permitted);
         assertEq(tokenA, 100 * 1e18);
@@ -59,5 +64,81 @@ contract DEXLiteTest is Test {
         vm.prank(liquidator);
         vm.expectRevert(DEXLite.invalidLiquidity.selector);
         DEX.addLiquidity(0, 50 * 1e18);
+    }
+
+    function testSwapTokenAForTokenB() public {
+        vm.prank(liquidator);
+        mockTokenA.approve(address(DEX), 100 * 1e18);
+        vm.prank(liquidator);
+        mockTokenB.approve(address(DEX), 50 * 1e18);
+        vm.prank(liquidator);
+        DEX.addLiquidity(100 * 1e18, 50 * 1e18);
+
+        uint256 balanceOfReserveA = mockTokenA.balanceOf(address(DEX));
+
+        vm.prank(user);
+        mockTokenA.approve(address(DEX), 50 * 1e18);
+        uint256 balanceBefore = mockTokenB.balanceOf(user);
+
+        vm.prank(user);
+        DEX.swapTokenAForTokenB(50 * 1e18);
+        uint256 balanceAfter = mockTokenB.balanceOf(user);
+
+        assertEq(DEX.reservesA(), balanceOfReserveA + 50 * 1e18);
+        assertGt(balanceAfter, balanceBefore);
+    }
+
+    function testExpectRevertInvalidAmount() public {
+        vm.prank(liquidator);
+        mockTokenA.approve(address(DEX), 100 * 1e18);
+        vm.prank(liquidator);
+        mockTokenB.approve(address(DEX), 50 * 1e18);
+        vm.prank(liquidator);
+        DEX.addLiquidity(100 * 1e18, 50 * 1e18);
+
+        vm.prank(user);
+        mockTokenA.approve(address(DEX), 50 * 1e18);
+
+        vm.prank(user);
+        vm.expectRevert(DEXLite.invalidAmount.selector);
+        DEX.swapTokenAForTokenB(0);
+    }
+
+    function testExpectRevertInsufficientBalance() public {
+        vm.prank(liquidator);
+        mockTokenA.approve(address(DEX), 100 * 1e18);
+        vm.prank(liquidator);
+        mockTokenB.approve(address(DEX), 50 * 1e18);
+        vm.prank(liquidator);
+        DEX.addLiquidity(100 * 1e18, 50 * 1e18);
+
+        vm.prank(user);
+        mockTokenA.approve(address(DEX), 50 * 1e18);
+
+        vm.prank(user);
+        vm.expectRevert(DEXLite.insufficientBalance.selector);
+        DEX.swapTokenAForTokenB(1000 * 1e18);
+    }
+
+    function testSwapTokenBForTokenA() public {
+        vm.prank(liquidator);
+        mockTokenA.approve(address(DEX), 100 * 1e18);
+        vm.prank(liquidator);
+        mockTokenB.approve(address(DEX), 50 * 1e18);
+        vm.prank(liquidator);
+        DEX.addLiquidity(100 * 1e18, 50 * 1e18);
+
+        uint256 balanceOfReserveA = mockTokenA.balanceOf(address(DEX));
+
+        vm.prank(user);
+        mockTokenA.approve(address(DEX), 50 * 1e18);
+        uint256 balanceBefore = mockTokenB.balanceOf(user);
+
+        vm.prank(user);
+        DEX.swapTokenAForTokenB(50 * 1e18);
+        uint256 balanceAfter = mockTokenB.balanceOf(user);
+
+        assertEq(DEX.reservesA(), balanceOfReserveA + 50 * 1e18);
+        assertGt(balanceAfter, balanceBefore);
     }
 }
