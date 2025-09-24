@@ -141,4 +141,8 @@ contract DEXLiteTest is Test {
         assertEq(DEX.reservesA(), balanceOfReserveA + 50 * 1e18);
         assertGt(balanceAfter, balanceBefore);
     }
+
+    function testRemoveLiquidity() public {
+        
+    }
 }

@@ -29,10 +29,12 @@ contract DEXLite is Ownable {
     error invalidAmount();
     error TransferFailed();
     error insufficientBalance();
+    error notEnoughShares();
 
     //events
     event LiqiudationAdded();
     event TokenSwapped();
+    event LiquidityRemoved(address indexed user, uint256 amountA, uint256 amountB);
 
     //modifier
     modifier onlyLiquidator() {
@@ -110,5 +112,28 @@ contract DEXLite is Ownable {
         emit TokenSwapped();
     }
 
-    function removeLiquidity(uint256 amount) external onlyLiquidator {}
+    function removeLiquidity(uint256 sharePercentage) external onlyLiquidator {
+        if (sharePercentage == 0) revert invalidAmount();
+        uint256 userShare = liquidator[msg.sender].PercentageShare;
+        if (sharePercentage > userShare) revert notEnoughShares();
+
+        uint256 amountA = (reservesA * sharePercentage) / 1e18;
+        uint256 amountB = (reservesB * sharePercentage) / 1e18;
+
+        reservesA -= amountA;
+        reservesB -= amountB;
+
+        liquidator[msg.sender].PercentageShare -= sharePercentage;
+    
+        if(liquidator[msg.sender].percentageShare == 0){
+            liquidator[msg.sender].permitted = false;
+            liquidator[msg.sender].tokenA = 0;
+            liquidator[msg.sender].tokenB = 0;
+        }
+
+        require(tokenA.transfer(msg.sender, amountA), "Token A Transfer failed");
+        require(tokenB.transfer(msg.sender, amountB), "Token B Transfer failed");
+
+        emit LiquidityRemoved(msg.sender, amountA, amountB);
+    }
 }
