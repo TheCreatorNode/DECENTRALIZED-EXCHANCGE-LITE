@@ -124,8 +124,8 @@ contract DEXLite is Ownable {
         reservesB -= amountB;
 
         liquidator[msg.sender].PercentageShare -= sharePercentage;
-    
-        if(liquidator[msg.sender].percentageShare == 0){
+
+        if (liquidator[msg.sender].PercentageShare == 0) {
             liquidator[msg.sender].permitted = false;
             liquidator[msg.sender].tokenA = 0;
             liquidator[msg.sender].tokenB = 0;

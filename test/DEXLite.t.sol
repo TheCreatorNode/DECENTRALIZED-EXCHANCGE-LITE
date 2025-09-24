@@ -142,7 +142,5 @@ contract DEXLiteTest is Test {
         assertGt(balanceAfter, balanceBefore);
     }
 
-    function testRemoveLiquidity() public {
-        
-    }
+    function testRemoveLiquidity() public {}
 }
